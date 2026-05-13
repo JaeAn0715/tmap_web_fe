@@ -1,0 +1,19 @@
+# 계정에 맞춤: `fly apps list`로 확인한 앱 이름과 동일해야 합니다.
+app = "tmap-web-fe"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
