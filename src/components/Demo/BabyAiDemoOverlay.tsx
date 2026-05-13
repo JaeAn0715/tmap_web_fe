@@ -14,6 +14,9 @@ import type { POI } from "@/types";
 
 const DEMO_HASH = "#/demo/baby-ai";
 
+/** 백엔드 시드 시 POI별 노트 주제·문장 다양화용 (동일 문장 반복 금지 요청). */
+const DEMO_NOTE_TOPICS = ["유아의자", "유모차", "이유식"] as const;
+
 function useDemoBabyHashOpen(): boolean {
   const [open, setOpen] = useState(() => window.location.hash === DEMO_HASH);
   useEffect(() => {
@@ -33,10 +36,17 @@ type SeedResponse = {
   sampleUserComments: string[];
 };
 
-function closeDemo() {
-  if (window.location.hash === DEMO_HASH) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", `${pathname}${search}`);
+function stripDemoHashFromUrl(): void {
+  if (window.location.hash !== DEMO_HASH) return;
+  const oldURL = window.location.href;
+  const { pathname, search, origin } = window.location;
+  const nextPath = `${pathname}${search}`;
+  window.history.replaceState(null, "", nextPath);
+  const newURL = `${origin}${nextPath}`;
+  try {
+    window.dispatchEvent(new HashChangeEvent("hashchange", { oldURL, newURL }));
+  } catch {
+    window.dispatchEvent(new Event("hashchange"));
   }
 }
 
@@ -84,30 +94,22 @@ function SummaryCard({
 }
 
 /**
- * Full-screen demo: seed "실험용" 즐겨찾기 모음 (50 POI + 아기 관련 노트) then
+ * Full-screen demo: seed "실험용" 즐겨찾기 모음 + 토픽별 공유 노트 then
  * compare Gemini POI summaries with vs without `userComments`.
  *
- * Open: `http://localhost:5173/#/demo/baby-ai` (requires API mode + login).
+ * Open: `#/demo/baby-ai` (API 모드 + 로그인). 시드는 JWT 사용자에만 귀속(백엔드 구현).
  */
 export function BabyAiDemoOverlay() {
-  const open = useDemoBabyHashOpen();
-  const user = useStore((s) => s.user);
+  const hashOpen = useDemoBabyHashOpen();
+  /** replaceState는 hashchange를 안 일으켜 오버레이가 남는 경우가 있어, 닫기 시 명시적으로 숨김 */
+  const [userDismissed, setUserDismissed] = useState(false);
 
-  const [secret, setSecret] = useState(() => {
-    try {
-      const fromSession = sessionStorage.getItem("tmap_demo_seed_secret_v1");
-      const fromEnv =
-        typeof import.meta.env.VITE_DEMO_SEED_SECRET === "string"
-          ? import.meta.env.VITE_DEMO_SEED_SECRET.trim()
-          : "";
-      return (fromSession ?? "").trim() || fromEnv;
-    } catch {
-      return typeof import.meta.env.VITE_DEMO_SEED_SECRET === "string"
-        ? import.meta.env.VITE_DEMO_SEED_SECRET.trim()
-        : "";
-    }
-  });
-  const [restrictEmail, setRestrictEmail] = useState(false);
+  useEffect(() => {
+    if (hashOpen) setUserDismissed(false);
+  }, [hashOpen]);
+
+  const open = hashOpen && !userDismissed;
+  const user = useStore((s) => s.user);
 
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedErr, setSeedErr] = useState<string | null>(null);
@@ -125,13 +127,9 @@ export function BabyAiDemoOverlay() {
   const [cErr, setCErr] = useState<string | null>(null);
   const [cData, setCData] = useState<PoiReviewSummaryResponseBody | null>(null);
 
-  const persistSecret = useCallback((v: string) => {
-    setSecret(v);
-    try {
-      sessionStorage.setItem("tmap_demo_seed_secret_v1", v);
-    } catch {
-      /* ignore */
-    }
+  const closeDemo = useCallback(() => {
+    setUserDismissed(true);
+    stripDemoHashFromUrl();
   }, []);
 
   const runCompare = useCallback(async (poi: POI, injected: string[]) => {
@@ -208,15 +206,13 @@ export function BabyAiDemoOverlay() {
     setSeedErr(null);
     setSeedOk(null);
     try {
-      const headers: Record<string, string> = {};
-      if (secret.trim()) headers["X-Demo-Seed-Secret"] = secret.trim();
-      const body: { expectEmail?: string } = {};
-      if (restrictEmail) body.expectEmail = "sprite1345@gmail.com";
-
       const res = await apiFetch<SeedResponse>("/demo/baby-ai-summary-seed", {
         method: "POST",
-        headers,
-        json: body,
+        json: {
+          topics: [...DEMO_NOTE_TOPICS],
+          /** 백엔드: POI·토픽마다 문장을 다르게 (템플릿 한 줄 복붙 금지) */
+          varyCommentsPerPoi: true,
+        },
       });
       setSeedOk(res);
       clearPoiReviewSummaryMemoryCache();
@@ -257,11 +253,13 @@ export function BabyAiDemoOverlay() {
               AI 요약 × 아기 관련 코멘트 데모
             </h1>
             <p className="text-[12px] text-gray-600 mt-1 leading-relaxed">
-              백엔드에 즐겨찾기 모음 <strong>실험용</strong>(고정 id, 50개 POI)과
-              각 POI당 유모차·아기의자·이유식 성격의 공유 노트 3개를 만듭니다.
-              이후 같은 장소에 대해 <code className="text-[11px] bg-gray-200 px-1 rounded">userComments</code>{" "}
-              없음 / 주입 / <code className="text-[11px] bg-gray-200 px-1 rounded">GET /me/clusters</code>{" "}
-              기반 실제 수집 세 가지로 Gemini 요약을 나란히 비교합니다.
+              백엔드가 <strong>현재 로그인한 계정</strong>에만 즐겨찾기 모음{" "}
+              <strong>실험용</strong>(고정 id, 다수 POI)과 공유 노트를 만듭니다. 토픽은{" "}
+              <strong>{DEMO_NOTE_TOPICS.join(" · ")}</strong> — POI마다 문장이 겹치지 않게
+              생성하도록 요청합니다. 이후 같은 장소에 대해{" "}
+              <code className="text-[11px] bg-gray-200 px-1 rounded">userComments</code> 없음 /
+              주입 / <code className="text-[11px] bg-gray-200 px-1 rounded">GET /me/clusters</code>{" "}
+              기반 실제 수집 세 가지로 Gemini 요약을 비교합니다.
             </p>
           </div>
           <button
@@ -282,30 +280,11 @@ export function BabyAiDemoOverlay() {
 
         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3 shadow-sm">
           <div className="text-sm font-semibold text-gray-800">1) 시드 실행</div>
-          <label className="flex flex-col gap-1 text-[12px] text-gray-700">
-            <span>
-              X-Demo-Seed-Secret (백엔드 <code>DEMO_SEED_SECRET</code> 과 같게.
-              비워 두면 로컬 non-production 에서만 허용됩니다.)
-            </span>
-            <input
-              className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-              value={secret}
-              onChange={(e) => persistSecret(e.target.value)}
-              placeholder="선택"
-              autoComplete="off"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-[12px] text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={restrictEmail}
-              onChange={(e) => setRestrictEmail(e.target.checked)}
-            />
-            <span>
-              로그인 계정이 <strong>sprite1345@gmail.com</strong> 일 때만 시드
-              (expectEmail)
-            </span>
-          </label>
+          <p className="text-[11px] text-gray-600 leading-relaxed">
+            별도 시크릿 없음. <strong>JWT로 식별된 본인 계정</strong>에만 데이터가 붙습니다
+            (백엔드에서 <code>/demo/baby-ai-summary-seed</code> 가 Bearer 필수·타 유저 격리를
+            보장해야 합니다).
+          </p>
           <button
             type="button"
             disabled={seedBusy || !user}
@@ -371,7 +350,7 @@ export function BabyAiDemoOverlay() {
               data={aData}
             />
             <SummaryCard
-              title="B — 시드 시 주입한 3줄 (유모차·의자·이유식)"
+              title={`B — 시드 시 주입 (${DEMO_NOTE_TOPICS.join("·")} 성격, 서로 다른 문장)`}
               loading={bLoading}
               err={bErr}
               data={bData}
