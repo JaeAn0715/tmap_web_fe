@@ -1,4 +1,5 @@
 import type { AuthUser } from "@/types";
+import { getApiBaseUrl } from "./apiConfig";
 import { apiFetch, getAuthToken, setAuthToken } from "./http";
 
 export type MeUser = {
@@ -21,7 +22,7 @@ export async function apiAuthGoogle(credential: string): Promise<{
   token: string;
   user: AuthUser;
 }> {
-  const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+  const base = getApiBaseUrl();
   if (!base) throw new Error("VITE_API_BASE_URL is not set");
 
   const res = await fetch(`${base}/auth/google`, {
@@ -55,7 +56,7 @@ export async function apiGetMe(): Promise<AuthUser> {
 }
 
 export async function apiLogout(): Promise<void> {
-  const base = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+  const base = getApiBaseUrl();
   if (!base) return;
   const token = getAuthToken();
   try {

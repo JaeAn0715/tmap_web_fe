@@ -1,4 +1,5 @@
 # 계정에 맞춤: `fly apps list`로 확인한 앱 이름과 동일해야 합니다.
+# 백엔드 CORS: Fly 백엔드 앱에 `CORS_ORIGIN`에 이 프론트 출처(https://tmap-web-fe.fly.dev 등) 포함.
 app = "tmap-web-fe"
 primary_region = "nrt"
 
