@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <title>TMAP POI Cluster</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <!--
+      TMAP V2 SDK must be loaded synchronously during HTML parse: the SDK uses
+      document.write() internally to inject sub-scripts, which browsers block
+      for asynchronously-loaded scripts. Vite replaces %VITE_TMAP_APP_KEY% at
+      dev/build time from .env.
+    -->
+    <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=%VITE_TMAP_APP_KEY%"></script>
+  </head>
+  <body class="overflow-hidden font-sans antialiased bg-tmap-surface text-tmap-ink">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

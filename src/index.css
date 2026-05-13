@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* font/TMAP surface — Tailwind `font-sans` / `bg-tmap-surface` on <body> */
+  /* Disable text selection app-wide; the UI is mouse-driven (drag map, drag
+     sticky notes, click cards). Real text-entry surfaces re-enable selection
+     below. */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection where text input or copy makes sense. */
+input,
+textarea,
+select,
+[contenteditable="true"],
+[contenteditable=""] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* TMAP map container baseline */
+.tmap-container {
+  position: absolute;
+  inset: 0;
+}
+
+/* Sticky note stays *above* the map but *below* fixed UI like search/toolbar. */
+.sticky-note-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+.sticky-note-layer > * {
+  pointer-events: auto;
+}
+
+.connection-line-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* Subtle scroll for sticky note bodies */
+.note-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.note-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+
+.recommend-refresh-hint {
+  animation: recommend-refresh-slide-up 0.32s ease-out forwards;
+}
+
+@keyframes recommend-refresh-slide-up {
+  from {
+    transform: translateY(calc(100% + 16px));
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
